@@ -1,0 +1,1033 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#f4f4f7">
+  <title>日历待办</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: light-dark(#f4f4f7, #18181a);
+      --surface: light-dark(#ffffff, #28282b);
+      --surface-2: light-dark(#f2f2f6, #343438);
+      --surface-hover: light-dark(#eaf3ff, #18344f);
+      --text: light-dark(#202124, #f5f5f7);
+      --muted: light-dark(#6f7178, #b1b2b7);
+      --line: light-dark(#dddde3, #45454a);
+      --primary: light-dark(#087ff5, #429cff);
+      --primary-strong: light-dark(#006bd6, #6ab1ff);
+      --primary-soft: light-dark(#e8f2ff, #19354f);
+      --danger: light-dark(#d92d20, #ff6b63);
+      --danger-soft: light-dark(#fff0ef, #4a2322);
+      --today: #ff453a;
+      --shadow: light-dark(0 18px 54px rgba(20, 24, 35, .12), 0 18px 54px rgba(0, 0, 0, .38));
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Microsoft YaHei", sans-serif;
+      font-synthesis: none;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-width: 320px;
+      min-height: 100vh;
+      color: var(--text);
+      background: var(--bg);
+    }
+
+    button, input { font: inherit; }
+
+    button {
+      color: inherit;
+      cursor: pointer;
+    }
+
+    button:focus-visible,
+    input:focus-visible,
+    [role="button"]:focus-visible {
+      outline: 3px solid color-mix(in srgb, var(--primary) 38%, transparent);
+      outline-offset: 2px;
+    }
+
+    .app {
+      width: min(1440px, 100%);
+      min-height: 100vh;
+      margin: 0 auto;
+      display: grid;
+      grid-template-rows: auto auto 1fr;
+      background: var(--surface);
+    }
+
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 72px;
+      padding: 14px 18px;
+      background: color-mix(in srgb, var(--surface) 94%, transparent);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .toolbar-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .month-title {
+      flex: 1;
+      margin: 0;
+      text-align: center;
+      font-size: 20px;
+      font-weight: 600;
+      letter-spacing: -.01em;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      min-height: 38px;
+      padding: 8px 12px;
+      color: var(--text);
+      background: var(--surface-2);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+
+    .btn:hover { border-color: color-mix(in srgb, var(--primary) 45%, var(--line)); }
+
+    .btn-primary {
+      color: #fff;
+      background: var(--primary);
+      border-color: var(--primary);
+    }
+
+    .btn-primary:hover { background: var(--primary-strong); }
+
+    .btn-danger {
+      color: var(--danger);
+      background: var(--danger-soft);
+      border-color: color-mix(in srgb, var(--danger) 25%, var(--line));
+    }
+
+    .btn-icon {
+      width: 38px;
+      padding-inline: 0;
+      font-size: 18px;
+      line-height: 1;
+    }
+
+    .storage-note {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      min-height: 34px;
+      padding: 7px 16px;
+      color: var(--muted);
+      background: var(--bg);
+      border-bottom: 1px solid var(--line);
+      font-size: 12px;
+      text-align: center;
+    }
+
+    .storage-note strong { color: var(--text); font-weight: 500; }
+
+    .main {
+      min-height: 0;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 320px;
+    }
+
+    .calendar-wrap {
+      min-width: 0;
+      background: var(--surface);
+    }
+
+    .weekdays,
+    .calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+    }
+
+    .weekday {
+      padding: 10px 9px;
+      color: var(--muted);
+      border-bottom: 1px solid var(--line);
+      text-align: right;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .day-cell {
+      position: relative;
+      min-width: 0;
+      min-height: 118px;
+      padding: 7px;
+      background: var(--surface);
+      border-right: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      transition: background-color .15s ease, box-shadow .15s ease;
+    }
+
+    .day-cell:nth-child(7n) { border-right: 0; }
+    .day-cell:hover { background: var(--surface-hover); }
+    .day-cell.is-outside { background: color-mix(in srgb, var(--bg) 72%, var(--surface)); }
+    .day-cell.is-selected { background: var(--primary-soft); box-shadow: inset 0 0 0 2px var(--primary); }
+
+    .day-head {
+      display: flex;
+      justify-content: flex-end;
+      margin-bottom: 5px;
+    }
+
+    .day-number {
+      width: 29px;
+      height: 29px;
+      display: grid;
+      place-items: center;
+      padding: 0;
+      color: var(--text);
+      background: transparent;
+      border: 0;
+      border-radius: 50%;
+      font-size: 13px;
+    }
+
+    .is-outside .day-number { color: var(--muted); }
+    .is-today .day-number { color: #fff; background: var(--today); font-weight: 600; }
+
+    .day-events {
+      display: grid;
+      gap: 4px;
+    }
+
+    .event-chip {
+      width: 100%;
+      min-width: 0;
+      overflow: hidden;
+      padding: 4px 5px;
+      color: var(--text);
+      background: color-mix(in srgb, var(--primary) 16%, var(--surface));
+      border: 0;
+      border-left: 3px solid var(--primary);
+      border-radius: 5px;
+      text-align: left;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 12px;
+      line-height: 1.25;
+    }
+
+    .event-chip:hover { background: color-mix(in srgb, var(--primary) 25%, var(--surface)); }
+
+    .more-count {
+      padding: 1px 5px;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .editor {
+      min-width: 0;
+      padding: 20px;
+      background: var(--bg);
+      border-left: 1px solid var(--line);
+    }
+
+    .editor-heading {
+      display: flex;
+      align-items: start;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .editor h2 {
+      margin: 0 0 5px;
+      font-size: 19px;
+      font-weight: 600;
+    }
+
+    .selected-date-label {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .field {
+      display: grid;
+      gap: 7px;
+      margin-bottom: 14px;
+    }
+
+    .field label {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .field input {
+      width: 100%;
+      min-height: 42px;
+      padding: 9px 11px;
+      color: var(--text);
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      font-size: 16px;
+    }
+
+    .form-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 18px;
+    }
+
+    .delete-row {
+      display: none;
+      margin-top: 10px;
+    }
+
+    .delete-row.is-visible { display: flex; }
+
+    .day-agenda {
+      margin-top: 26px;
+      padding-top: 18px;
+      border-top: 1px solid var(--line);
+    }
+
+    .day-agenda h3 {
+      margin: 0 0 10px;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .agenda-list {
+      display: grid;
+      gap: 7px;
+    }
+
+    .agenda-item {
+      width: 100%;
+      display: grid;
+      grid-template-columns: 50px minmax(0, 1fr);
+      gap: 8px;
+      padding: 9px;
+      color: var(--text);
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      text-align: left;
+    }
+
+    .agenda-item:hover { border-color: color-mix(in srgb, var(--primary) 45%, var(--line)); }
+    .agenda-time { color: var(--primary); font-size: 12px; font-weight: 600; }
+    .agenda-title { overflow-wrap: anywhere; font-size: 13px; }
+
+    .empty-state {
+      margin: 0;
+      padding: 14px 10px;
+      color: var(--muted);
+      background: color-mix(in srgb, var(--surface) 62%, transparent);
+      border: 1px dashed var(--line);
+      border-radius: 10px;
+      font-size: 12px;
+      text-align: center;
+    }
+
+    .status {
+      min-height: 20px;
+      margin: 10px 0 0;
+      color: var(--primary);
+      font-size: 12px;
+    }
+
+    .status.is-error { color: var(--danger); }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      display: none;
+      place-items: center;
+      padding: 20px;
+      background: rgba(0, 0, 0, .45);
+    }
+
+    .modal-backdrop.is-open { display: grid; }
+
+    .modal {
+      width: min(430px, 100%);
+      padding: 22px;
+      color: var(--text);
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+    }
+
+    .modal h2 { margin: 0 0 8px; font-size: 18px; }
+    .modal p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
+    .modal-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 22px;
+      z-index: 30;
+      max-width: calc(100% - 32px);
+      padding: 10px 14px;
+      color: #fff;
+      background: rgba(34, 35, 38, .94);
+      border-radius: 10px;
+      box-shadow: 0 8px 28px rgba(0,0,0,.24);
+      font-size: 13px;
+      opacity: 0;
+      pointer-events: none;
+      transform: translate(-50%, 10px);
+      transition: opacity .18s ease, transform .18s ease;
+    }
+
+    .toast.is-visible { opacity: 1; transform: translate(-50%, 0); }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    @media (min-width: 1180px) {
+      body { padding: 22px; }
+      .app {
+        min-height: calc(100vh - 44px);
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        box-shadow: var(--shadow);
+      }
+    }
+
+    @media (max-width: 940px) {
+      .main { grid-template-columns: 1fr; }
+      .editor { border-top: 1px solid var(--line); border-left: 0; }
+      .day-cell { min-height: 104px; }
+    }
+
+    @media (max-width: 700px) {
+      .toolbar { align-items: stretch; flex-wrap: wrap; padding: 12px; }
+      .month-title { order: -2; flex-basis: calc(100% - 112px); text-align: left; line-height: 38px; }
+      .toolbar-actions { order: -1; margin-left: auto; }
+      .toolbar-backups { width: 100%; }
+      .toolbar-backups .btn { flex: 1; }
+      .day-cell { min-height: 82px; padding: 4px; }
+      .weekday { padding: 8px 2px; text-align: center; }
+      .day-head { justify-content: center; margin-bottom: 2px; }
+      .event-chip { padding: 3px; border-left-width: 2px; font-size: 11px; }
+      .more-count { padding-inline: 2px; text-align: center; }
+      .editor { padding: 18px 14px 28px; }
+    }
+
+    @media (max-width: 430px) {
+      .btn { padding-inline: 10px; }
+      .btn .wide-label { display: none; }
+      .day-cell { min-height: 72px; }
+      .event-chip { max-height: 20px; }
+      .event-chip:nth-child(n+2) { display: none; }
+      .month-title { font-size: 18px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="toolbar">
+      <div class="toolbar-group" aria-label="月份导航">
+        <button class="btn btn-icon" id="prevMonth" type="button" aria-label="上个月">‹</button>
+        <button class="btn" id="todayButton" type="button">今天</button>
+        <button class="btn btn-icon" id="nextMonth" type="button" aria-label="下个月">›</button>
+      </div>
+
+      <h1 class="month-title" id="monthTitle"></h1>
+
+      <div class="toolbar-group toolbar-actions">
+        <button class="btn btn-primary" id="newEventButton" type="button" aria-label="新建事项"><span aria-hidden="true">＋</span><span class="wide-label">新建事项</span></button>
+      </div>
+
+      <div class="toolbar-group toolbar-backups" aria-label="备份操作">
+        <button class="btn" id="importButton" type="button">导入备份</button>
+        <button class="btn" id="exportButton" type="button">导出备份</button>
+        <input class="sr-only" id="importFile" type="file" accept="application/json,.json">
+      </div>
+    </header>
+
+    <div class="storage-note" id="storageNote">
+      <span aria-hidden="true">●</span>
+      <span><strong>数据只保存在当前浏览器。</strong>把 HTML 发给别人后，对方会拥有独立的日历。</span>
+    </div>
+
+    <div class="main">
+      <section class="calendar-wrap" aria-labelledby="monthTitle">
+        <div class="weekdays" aria-hidden="true">
+          <div class="weekday">周日</div>
+          <div class="weekday">周一</div>
+          <div class="weekday">周二</div>
+          <div class="weekday">周三</div>
+          <div class="weekday">周四</div>
+          <div class="weekday">周五</div>
+          <div class="weekday">周六</div>
+        </div>
+        <div class="calendar-grid" id="calendarGrid" aria-label="月历"></div>
+      </section>
+
+      <aside class="editor" aria-labelledby="editorTitle">
+        <div class="editor-heading">
+          <div>
+            <h2 id="editorTitle">添加事项</h2>
+            <p class="selected-date-label" id="selectedDateLabel"></p>
+          </div>
+        </div>
+
+        <form id="eventForm" novalidate>
+          <div class="field">
+            <label for="eventTitle">事项标题</label>
+            <input id="eventTitle" name="title" type="text" maxlength="120" placeholder="例如：提交周报" autocomplete="off" required>
+          </div>
+          <div class="field">
+            <label for="eventDate">日期</label>
+            <input id="eventDate" name="date" type="date" required>
+          </div>
+          <div class="field">
+            <label for="eventTime">时间（可选）</label>
+            <input id="eventTime" name="time" type="time">
+          </div>
+
+          <div class="form-actions">
+            <button class="btn" id="cancelEditButton" type="button">清空</button>
+            <button class="btn btn-primary" id="saveEventButton" type="submit">添加事项</button>
+          </div>
+          <div class="delete-row" id="deleteRow">
+            <button class="btn btn-danger" id="deleteEventButton" type="button">删除这条事项</button>
+          </div>
+          <p class="status" id="formStatus" role="status" aria-live="polite"></p>
+        </form>
+
+        <section class="day-agenda" aria-labelledby="agendaTitle">
+          <h3 id="agendaTitle">当天事项</h3>
+          <div class="agenda-list" id="agendaList"></div>
+        </section>
+      </aside>
+    </div>
+  </main>
+
+  <div class="modal-backdrop" id="importModal" role="presentation">
+    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="importModalTitle" aria-describedby="importModalDescription">
+      <h2 id="importModalTitle">如何导入备份？</h2>
+      <p id="importModalDescription">“合并”会保留现有事项，并添加备份中的事项；“覆盖”会先清空当前事项。覆盖操作无法撤销。</p>
+      <div class="modal-actions">
+        <button class="btn" id="cancelImportButton" type="button">取消</button>
+        <button class="btn" id="mergeImportButton" type="button">合并</button>
+        <button class="btn btn-danger" id="replaceImportButton" type="button">覆盖</button>
+      </div>
+    </section>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    (() => {
+      'use strict';
+
+      const STORAGE_KEY = 'calendarTodo.v1';
+      const BACKUP_VERSION = 1;
+      const WEEKDAY_NAMES = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
+
+      const elements = {
+        monthTitle: document.getElementById('monthTitle'),
+        calendarGrid: document.getElementById('calendarGrid'),
+        selectedDateLabel: document.getElementById('selectedDateLabel'),
+        editorTitle: document.getElementById('editorTitle'),
+        eventForm: document.getElementById('eventForm'),
+        eventTitle: document.getElementById('eventTitle'),
+        eventDate: document.getElementById('eventDate'),
+        eventTime: document.getElementById('eventTime'),
+        saveEventButton: document.getElementById('saveEventButton'),
+        cancelEditButton: document.getElementById('cancelEditButton'),
+        deleteEventButton: document.getElementById('deleteEventButton'),
+        deleteRow: document.getElementById('deleteRow'),
+        formStatus: document.getElementById('formStatus'),
+        agendaList: document.getElementById('agendaList'),
+        prevMonth: document.getElementById('prevMonth'),
+        nextMonth: document.getElementById('nextMonth'),
+        todayButton: document.getElementById('todayButton'),
+        newEventButton: document.getElementById('newEventButton'),
+        exportButton: document.getElementById('exportButton'),
+        importButton: document.getElementById('importButton'),
+        importFile: document.getElementById('importFile'),
+        importModal: document.getElementById('importModal'),
+        mergeImportButton: document.getElementById('mergeImportButton'),
+        replaceImportButton: document.getElementById('replaceImportButton'),
+        cancelImportButton: document.getElementById('cancelImportButton'),
+        toast: document.getElementById('toast'),
+        storageNote: document.getElementById('storageNote')
+      };
+
+      const today = startOfDay(new Date());
+      let viewDate = new Date(today.getFullYear(), today.getMonth(), 1);
+      let selectedDate = formatDate(today);
+      let events = [];
+      let editingId = null;
+      let pendingImport = null;
+      let toastTimer = null;
+      let storageAvailable = true;
+
+      function startOfDay(date) {
+        return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+      }
+
+      function pad(value) {
+        return String(value).padStart(2, '0');
+      }
+
+      function formatDate(date) {
+        return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+      }
+
+      function parseDate(value) {
+        const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+        if (!match) return null;
+        const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+        if (date.getFullYear() !== Number(match[1]) || date.getMonth() !== Number(match[2]) - 1 || date.getDate() !== Number(match[3])) return null;
+        return date;
+      }
+
+      function humanDate(value) {
+        const date = parseDate(value);
+        if (!date) return value;
+        return `${date.getFullYear()} 年 ${date.getMonth() + 1} 月 ${date.getDate()} 日 · ${WEEKDAY_NAMES[date.getDay()]}`;
+      }
+
+      function createId() {
+        if (window.crypto && typeof window.crypto.randomUUID === 'function') return window.crypto.randomUUID();
+        return `event-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      }
+
+      function isValidEvent(item) {
+        return Boolean(
+          item &&
+          typeof item.id === 'string' && item.id.length > 0 &&
+          typeof item.title === 'string' && item.title.trim().length > 0 && item.title.length <= 120 &&
+          typeof item.date === 'string' && parseDate(item.date) &&
+          (item.time === '' || (typeof item.time === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(item.time))) &&
+          typeof item.createdAt === 'string' &&
+          typeof item.updatedAt === 'string'
+        );
+      }
+
+      function normalizeEvent(item) {
+        return {
+          id: item.id,
+          title: item.title.trim(),
+          date: item.date,
+          time: item.time || '',
+          createdAt: item.createdAt,
+          updatedAt: item.updatedAt
+        };
+      }
+
+      function sortEvents(items) {
+        return [...items].sort((a, b) => {
+          if (a.date !== b.date) return a.date.localeCompare(b.date);
+          if (a.time && b.time && a.time !== b.time) return a.time.localeCompare(b.time);
+          if (a.time && !b.time) return -1;
+          if (!a.time && b.time) return 1;
+          return a.createdAt.localeCompare(b.createdAt);
+        });
+      }
+
+      function loadEvents() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if (!raw) return [];
+          const parsed = JSON.parse(raw);
+          const items = Array.isArray(parsed) ? parsed : parsed.events;
+          if (!Array.isArray(items)) throw new Error('Invalid storage format');
+          const validItems = items.filter(isValidEvent).map(normalizeEvent);
+          if (validItems.length !== items.length) showToast('已忽略无法识别的本地记录');
+          return sortEvents(validItems);
+        } catch (error) {
+          storageAvailable = false;
+          showStorageWarning('无法读取浏览器存储。请使用导入备份恢复，新增内容请及时导出。');
+          return [];
+        }
+      }
+
+      function saveEvents() {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: BACKUP_VERSION, events }));
+          storageAvailable = true;
+          showStorageDefault();
+          return true;
+        } catch (error) {
+          storageAvailable = false;
+          showStorageWarning('浏览器无法保存数据。当前内容仍在页面中，请立即导出备份。');
+          showToast('保存失败，请导出备份');
+          return false;
+        }
+      }
+
+      function showStorageDefault() {
+        elements.storageNote.innerHTML = '<span aria-hidden="true">●</span><span><strong>数据只保存在当前浏览器。</strong>把 HTML 发给别人后，对方会拥有独立的日历。</span>';
+        elements.storageNote.style.color = '';
+      }
+
+      function showStorageWarning(message) {
+        elements.storageNote.textContent = message;
+        elements.storageNote.style.color = 'var(--danger)';
+      }
+
+      function render() {
+        renderCalendar();
+        renderEditorDate();
+        renderAgenda();
+      }
+
+      function renderCalendar() {
+        const year = viewDate.getFullYear();
+        const month = viewDate.getMonth();
+        elements.monthTitle.textContent = `${year} 年 ${month + 1} 月`;
+        elements.calendarGrid.replaceChildren();
+
+        const firstDay = new Date(year, month, 1);
+        const gridStart = new Date(year, month, 1 - firstDay.getDay());
+
+        for (let index = 0; index < 42; index += 1) {
+          const date = new Date(gridStart.getFullYear(), gridStart.getMonth(), gridStart.getDate() + index);
+          const dateKey = formatDate(date);
+          const dayEvents = sortEvents(events.filter((event) => event.date === dateKey));
+          const cell = document.createElement('div');
+          cell.className = 'day-cell';
+          cell.dataset.date = dateKey;
+          cell.setAttribute('role', 'group');
+          cell.setAttribute('aria-label', `${humanDate(dateKey)}，${dayEvents.length} 条事项`);
+
+          if (date.getMonth() !== month) cell.classList.add('is-outside');
+          if (dateKey === formatDate(today)) cell.classList.add('is-today');
+          if (dateKey === selectedDate) cell.classList.add('is-selected');
+
+          const head = document.createElement('div');
+          head.className = 'day-head';
+          const number = document.createElement('button');
+          number.className = 'day-number';
+          number.type = 'button';
+          number.textContent = String(date.getDate());
+          number.setAttribute('aria-label', `选择 ${humanDate(dateKey)}`);
+          head.appendChild(number);
+
+          const eventList = document.createElement('div');
+          eventList.className = 'day-events';
+          dayEvents.slice(0, 3).forEach((event) => {
+            const eventButton = document.createElement('button');
+            eventButton.className = 'event-chip';
+            eventButton.type = 'button';
+            eventButton.textContent = `${event.time ? `${event.time} ` : ''}${event.title}`;
+            eventButton.title = eventButton.textContent;
+            eventButton.addEventListener('click', (clickEvent) => {
+              clickEvent.stopPropagation();
+              selectDate(event.date, true);
+              beginEdit(event.id);
+            });
+            eventList.appendChild(eventButton);
+          });
+
+          if (dayEvents.length > 3) {
+            const more = document.createElement('div');
+            more.className = 'more-count';
+            more.textContent = `还有 ${dayEvents.length - 3} 项`;
+            eventList.appendChild(more);
+          }
+
+          cell.append(head, eventList);
+          cell.addEventListener('click', () => selectDate(dateKey, true));
+          elements.calendarGrid.appendChild(cell);
+        }
+      }
+
+      function renderEditorDate() {
+        elements.selectedDateLabel.textContent = humanDate(selectedDate);
+        if (!editingId) elements.eventDate.value = selectedDate;
+      }
+
+      function renderAgenda() {
+        const dayEvents = sortEvents(events.filter((event) => event.date === selectedDate));
+        elements.agendaList.replaceChildren();
+        if (!dayEvents.length) {
+          const empty = document.createElement('p');
+          empty.className = 'empty-state';
+          empty.textContent = '这一天还没有事项';
+          elements.agendaList.appendChild(empty);
+          return;
+        }
+
+        dayEvents.forEach((event) => {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = 'agenda-item';
+          button.setAttribute('aria-label', `编辑事项：${event.time ? `${event.time}，` : ''}${event.title}`);
+
+          const time = document.createElement('span');
+          time.className = 'agenda-time';
+          time.textContent = event.time || '全天';
+          const title = document.createElement('span');
+          title.className = 'agenda-title';
+          title.textContent = event.title;
+
+          button.append(time, title);
+          button.addEventListener('click', () => beginEdit(event.id));
+          elements.agendaList.appendChild(button);
+        });
+      }
+
+      function selectDate(dateKey, updateView) {
+        const parsed = parseDate(dateKey);
+        if (!parsed) return;
+        selectedDate = dateKey;
+        if (updateView && (parsed.getFullYear() !== viewDate.getFullYear() || parsed.getMonth() !== viewDate.getMonth())) {
+          viewDate = new Date(parsed.getFullYear(), parsed.getMonth(), 1);
+        }
+        resetForm(false);
+        render();
+      }
+
+      function beginEdit(id) {
+        const event = events.find((item) => item.id === id);
+        if (!event) return;
+        editingId = id;
+        selectedDate = event.date;
+        elements.editorTitle.textContent = '编辑事项';
+        elements.eventTitle.value = event.title;
+        elements.eventDate.value = event.date;
+        elements.eventTime.value = event.time;
+        elements.saveEventButton.textContent = '保存修改';
+        elements.deleteRow.classList.add('is-visible');
+        setFormStatus('');
+        renderCalendar();
+        renderEditorDate();
+        renderAgenda();
+        elements.eventTitle.focus();
+      }
+
+      function resetForm(focusTitle = false) {
+        editingId = null;
+        elements.editorTitle.textContent = '添加事项';
+        elements.eventForm.reset();
+        elements.eventDate.value = selectedDate;
+        elements.saveEventButton.textContent = '添加事项';
+        elements.deleteRow.classList.remove('is-visible');
+        setFormStatus('');
+        if (focusTitle) elements.eventTitle.focus();
+      }
+
+      function setFormStatus(message, isError = false) {
+        elements.formStatus.textContent = message;
+        elements.formStatus.classList.toggle('is-error', isError);
+      }
+
+      function handleSubmit(submitEvent) {
+        submitEvent.preventDefault();
+        const title = elements.eventTitle.value.trim();
+        const date = elements.eventDate.value;
+        const time = elements.eventTime.value;
+
+        if (!title) {
+          setFormStatus('请填写事项标题', true);
+          elements.eventTitle.focus();
+          return;
+        }
+        if (!parseDate(date)) {
+          setFormStatus('请选择有效日期', true);
+          elements.eventDate.focus();
+          return;
+        }
+
+        const now = new Date().toISOString();
+        if (editingId) {
+          const index = events.findIndex((item) => item.id === editingId);
+          if (index === -1) {
+            setFormStatus('找不到这条事项，请重新选择', true);
+            resetForm();
+            return;
+          }
+          events[index] = { ...events[index], title, date, time, updatedAt: now };
+          selectedDate = date;
+          viewDate = new Date(parseDate(date).getFullYear(), parseDate(date).getMonth(), 1);
+          events = sortEvents(events);
+          saveEvents();
+          resetForm();
+          render();
+          showToast('事项已更新');
+          return;
+        }
+
+        events.push({ id: createId(), title, date, time, createdAt: now, updatedAt: now });
+        events = sortEvents(events);
+        selectedDate = date;
+        viewDate = new Date(parseDate(date).getFullYear(), parseDate(date).getMonth(), 1);
+        saveEvents();
+        resetForm();
+        render();
+        showToast('事项已添加');
+      }
+
+      function deleteEditingEvent() {
+        if (!editingId) return;
+        const event = events.find((item) => item.id === editingId);
+        if (!event) return;
+        if (!window.confirm(`确定删除“${event.title}”吗？此操作无法撤销。`)) return;
+        events = events.filter((item) => item.id !== editingId);
+        saveEvents();
+        resetForm();
+        render();
+        showToast('事项已删除');
+      }
+
+      function changeMonth(delta) {
+        viewDate = new Date(viewDate.getFullYear(), viewDate.getMonth() + delta, 1);
+        selectedDate = formatDate(viewDate);
+        resetForm();
+        render();
+      }
+
+      function goToToday() {
+        viewDate = new Date(today.getFullYear(), today.getMonth(), 1);
+        selectedDate = formatDate(today);
+        resetForm();
+        render();
+      }
+
+      function exportBackup() {
+        const backup = {
+          app: '日历待办',
+          version: BACKUP_VERSION,
+          exportedAt: new Date().toISOString(),
+          events: sortEvents(events)
+        };
+        const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `日历待办备份-${formatDate(new Date())}.json`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+        showToast(`已导出 ${events.length} 条事项`);
+      }
+
+      async function readImportFile(file) {
+        try {
+          const text = await file.text();
+          const backup = JSON.parse(text);
+          if (!backup || backup.version !== BACKUP_VERSION || !Array.isArray(backup.events)) {
+            throw new Error('备份版本或格式不受支持');
+          }
+          if (!backup.events.every(isValidEvent)) {
+            throw new Error('备份中包含无效事项');
+          }
+          pendingImport = sortEvents(backup.events.map(normalizeEvent));
+          openImportModal();
+        } catch (error) {
+          pendingImport = null;
+          showToast(`导入失败：${error.message || '无法读取文件'}`);
+        } finally {
+          elements.importFile.value = '';
+        }
+      }
+
+      function openImportModal() {
+        elements.importModal.classList.add('is-open');
+        elements.cancelImportButton.focus();
+      }
+
+      function closeImportModal() {
+        elements.importModal.classList.remove('is-open');
+        pendingImport = null;
+        elements.importButton.focus();
+      }
+
+      function applyImport(mode) {
+        if (!pendingImport) return;
+        if (mode === 'replace') {
+          events = sortEvents(pendingImport);
+        } else {
+          const byId = new Map(events.map((item) => [item.id, item]));
+          pendingImport.forEach((item) => {
+            const existing = byId.get(item.id);
+            if (!existing || item.updatedAt > existing.updatedAt) byId.set(item.id, item);
+          });
+          events = sortEvents([...byId.values()]);
+        }
+        const importedCount = pendingImport.length;
+        saveEvents();
+        pendingImport = null;
+        elements.importModal.classList.remove('is-open');
+        resetForm();
+        render();
+        elements.importButton.focus();
+        showToast(`已${mode === 'replace' ? '覆盖' : '合并'} ${importedCount} 条备份事项`);
+      }
+
+      function showToast(message) {
+        window.clearTimeout(toastTimer);
+        elements.toast.textContent = message;
+        elements.toast.classList.add('is-visible');
+        toastTimer = window.setTimeout(() => elements.toast.classList.remove('is-visible'), 2600);
+      }
+
+      elements.eventForm.addEventListener('submit', handleSubmit);
+      elements.deleteEventButton.addEventListener('click', deleteEditingEvent);
+      elements.cancelEditButton.addEventListener('click', () => resetForm(true));
+      elements.prevMonth.addEventListener('click', () => changeMonth(-1));
+      elements.nextMonth.addEventListener('click', () => changeMonth(1));
+      elements.todayButton.addEventListener('click', goToToday);
+      elements.newEventButton.addEventListener('click', () => resetForm(true));
+      elements.exportButton.addEventListener('click', exportBackup);
+      elements.importButton.addEventListener('click', () => elements.importFile.click());
+      elements.importFile.addEventListener('change', () => {
+        const file = elements.importFile.files && elements.importFile.files[0];
+        if (file) readImportFile(file);
+      });
+      elements.cancelImportButton.addEventListener('click', closeImportModal);
+      elements.mergeImportButton.addEventListener('click', () => applyImport('merge'));
+      elements.replaceImportButton.addEventListener('click', () => applyImport('replace'));
+      elements.importModal.addEventListener('click', (event) => {
+        if (event.target === elements.importModal) closeImportModal();
+      });
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && elements.importModal.classList.contains('is-open')) closeImportModal();
+      });
+
+      events = loadEvents();
+      if (storageAvailable) showStorageDefault();
+      resetForm();
+      render();
+    })();
+  </script>
+</body>
+</html>
